@@ -1,14 +1,13 @@
 package de.erdtmann.soft.homesteuerung.piControllerPool.controller;
 
-import javax.annotation.PostConstruct;
 
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
 
-import com.pi4j.io.gpio.GpioPinDigitalOutput;
-import com.pi4j.io.gpio.PinState;
-import com.pi4j.io.gpio.RaspiPin;
+import com.pi4j.io.gpio.digital.DigitalOutput;
+import com.pi4j.io.gpio.digital.DigitalOutputConfig;
+import com.pi4j.io.gpio.digital.DigitalState;
 
 import ch.qos.logback.classic.Logger;
 
@@ -17,18 +16,32 @@ public class VentilController {
 
 	Logger log = (Logger) LoggerFactory.getLogger(VentilController.class);
 
-	@Autowired
-	GpioService gpioService;
+//	@Autowired
+	private GpioService gpioService;
 	
-	private GpioPinDigitalOutput ventilausgang = null;
+	private static final int PIN_VENTIL = 17;
+	
+	private DigitalOutputConfig ventilConfig;
+	private DigitalOutput ventilausgang;
 
-	@PostConstruct
+	public VentilController(@Autowired GpioService gpioService) {
+		this.gpioService = gpioService;
+		init();
+	}
+	
+//	@PostConstruct
 	public void init() {
 		try {
-			if (gpioService.getGpio() != null) {
-				ventilausgang = gpioService.getGpio().provisionDigitalOutputPin(RaspiPin.GPIO_00, "Ventilausgang", PinState.LOW);
-				ventilausgang.setShutdownOptions(true, PinState.LOW);
-			}
+			if (this.gpioService.getContext() != null) {
+				ventilConfig = DigitalOutput.newConfigBuilder(gpioService.getContext())
+						.id("ventil")
+						.name("Ventilausgang")
+						.address(PIN_VENTIL)
+						.shutdown(DigitalState.LOW)
+						.initial(DigitalState.LOW)
+						.provider("pigpio-digital-output")
+						.build();
+				ventilausgang = gpioService.getContext().create(ventilConfig);			}
 
 		} catch (Exception e) {
 			log.error("Fehler beim initialisieren des Ventil Controllers");
@@ -40,7 +53,7 @@ public class VentilController {
 	
 	public void ventilAufPool() {
 		if (ventilausgang != null) {
-			ventilausgang.setState(PinState.LOW);
+			ventilausgang.low();
 			
 			log.debug("Ventil auf Pool");
 		}
@@ -48,7 +61,7 @@ public class VentilController {
 
 	public void ventilAufHeizung() {
 		if (ventilausgang != null) {
-			ventilausgang.setState(PinState.HIGH);
+			ventilausgang.high();
 			
 			log.debug("Ventil auf Heizung");
 		}
